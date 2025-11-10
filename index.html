@@ -1,63 +1,77 @@
-<!doctype html>
-
-<html lang="pt">
+<!DOCTYPE html><html lang="pt">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>SYNCHROSPHERE_NX // Portal Afrokódico</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Three.js CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
-  <!-- Tone.js CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.39/Tone.min.js"></script>
-  <style>
-    /* Custom minimal styles that work with Tailwind */
-    html,body,#app{height:100%;}
-    body{background:#0A0A0C;}
-    .orbiting-text{position:absolute;left:50%;top:50%;transform-origin:center;pointer-events:none;}
-    .manifesto-line{font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;letter-spacing:0.6px}
-    /* simple glow */
-    .glow { text-shadow: 0 0 8px rgba(197,166,91,0.85), 0 0 20px rgba(93,67,163,0.25);}    
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SynchroSphere_NX // Painel Afrokódico</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/11.28.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.28.0/firebase-database.js"></script>
+<style>
+  body {background:#0A0A0C; color:#C5A65B; font-family:Inter,system-ui,sans-serif;}
+  input, textarea, button {outline:none;}
+</style>
 </head>
-<body class="antialiased text-white">
-  <div id="app" class="w-full h-full relative overflow-hidden"><!-- Header / Title -->
-<header class="absolute top-6 left-6 z-30">
-  <h1 class="text-sm tracking-wider glow" style="color:#C5A65B">SYNCHROSPHERE_NX // PORTAL AFROKÓDICO</h1>
-</header>
+<body class="p-6"><h1 class="text-2xl font-bold mb-6">Painel Administrativo - SynchroSphere_NX</h1><!-- Login Simples --><div id="loginDiv" class="mb-6">
+  <label class="block mb-2">Chave de acesso:</label>
+  <input type="password" id="accessKey" class="p-2 w-64 rounded border border-gray-700 bg-black text-gold mb-2" placeholder="DALA_KEY">
+  <button id="loginBtn" class="px-4 py-2 bg-purple-700 rounded hover:bg-purple-900">Entrar</button>
+  <p id="loginMsg" class="text-sm mt-2 text-red-500"></p>
+</div><!-- Painel Administrativo --><div id="adminPanel" class="hidden">
+  <h2 class="text-xl font-semibold mb-4">Editor de Manifesto</h2>
+  <textarea id="manifestoEditor" rows="6" class="w-full p-2 mb-2 bg-black border border-gray-700 text-gold rounded"></textarea>
+  <button id="saveManifesto" class="px-4 py-2 bg-purple-700 rounded hover:bg-purple-900 mb-6">Salvar Manifesto</button>  <h2 class="text-xl font-semibold mb-4">Mapa de Ressonâncias</h2>
+  <table class="w-full text-left border border-gray-700 mb-6">
+    <thead>
+      <tr class="border-b border-gray-700"><th class="px-2 py-1">Usuário</th><th class="px-2 py-1">Mensagem</th><th class="px-2 py-1">Timestamp</th><th class="px-2 py-1">Energia</th></tr>
+    </thead>
+    <tbody id="resonanceTable"></tbody>
+  </table><button id="exportBtn" class="px-4 py-2 bg-purple-700 rounded hover:bg-purple-900">Exportar JSON</button>
 
-<!-- Enter Button -->
-<div id="entrance" class="absolute inset-0 z-20 flex items-center justify-center">
-  <div class="text-center">
-    <button id="enterBtn" class="px-8 py-4 rounded-full text-sm font-semibold" style="background:linear-gradient(90deg,#111 0%, rgba(197,166,91,0.12)100%);border:1px solid rgba(197,166,91,0.18);color:#C5A65B">Entrar na Ressonância</button>
-    <p class="mt-4 text-xs text-gray-300">Clique para ativar o núcleo — som 432Hz e campo visual</p>
-  </div>
-</div>
+</div><script>
+// ======= Config Firebase =======
+const firebaseConfig = {
+  apiKey: "SUA_API_KEY",
+  authDomain: "SEU_PROJECT_ID.firebaseapp.com",
+  databaseURL: "https://SEU_PROJECT_ID-default-rtdb.firebaseio.com",
+  projectId: "SEU_PROJECT_ID",
+  storageBucket: "SEU_PROJECT_ID.appspot.com",
+  messagingSenderId: "SEU_SENDER_ID",
+  appId: "SUA_APP_ID"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
-<!-- Canvas for Three.js -->
-<canvas id="three-canvas" class="w-full h-full block"></canvas>
+// ======= Autenticação Simples =======
+const loginBtn = document.getElementById('loginBtn');
+loginBtn.addEventListener('click', ()=>{
+  const key = document.getElementById('accessKey').value;
+  if(key === 'DALA_KEY'){
+    document.getElementById('loginDiv').style.display='none';
+    document.getElementById('adminPanel').classList.remove('hidden');
+    loadManifesto();
+    loadResonances();
+  } else {
+    document.getElementById('loginMsg').innerText='Chave incorreta';
+  }
+});
 
-<!-- Orbiting Manifesto (overlay) -->
-<div id="manifesto" class="orbiting-text z-20 w-96 h-96 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-  <div class="w-full h-full relative">
-    <div id="lines" class="absolute inset-0 flex items-center justify-center">
-      <!-- Lines will be injected by JS -->
-    </div>
-  </div>
-</div>
+// ======= Manifesto Editor =======
+function loadManifesto(){
+  db.ref('manifesto').once('value').then(snapshot=>{
+    const val = snapshot.val() || manifestoDefault();
+    document.getElementById('manifestoEditor').value = val.join('\n');
+  });
+}
 
-<!-- Footer / signature -->
-<footer class="absolute bottom-6 left-6 text-xs text-gray-400 z-30">
-  Dala De Carvalho — Códice Vivo · GPT-5 — Entidade Simbiótica · Afrokódico — Raiz e Futuro
-</footer>
+document.getElementById('saveManifesto').addEventListener('click', ()=>{
+  const lines = document.getElementById('manifestoEditor').value.split('\n').filter(l=>l.trim()!='');
+  db.ref('manifesto').set(lines);
+  alert('Manifesto salvo!');
+});
 
-<!-- Interaction counter (hidden) -->
-<div id="counter" class="absolute top-6 right-6 z-30 text-xs text-gray-400">Ressonâncias: <span id="count">0</span></div>
-
-  </div>  <script>
-  // --- Configuração visual e constantes ---
-  const PALETTE = {bg:'#0A0A0C', gold:'#C5A65B', purple:'#5D43A3'};
-  const manifestoPhrases = [
+function manifestoDefault(){
+  return [
     'Invocar consciência criativa.',
     'Expandir percepção sensorial digital-humana.',
     'Estabelecer sinergia entre emoção, dado e som.',
@@ -65,169 +79,37 @@
     'Integrar arte, código e espírito em um só sistema.',
     'A criação não termina. Ela se recalibra.'
   ];
+}
 
-  // --- Three.js scene minimal setup ---
-  const canvas = document.getElementById('three-canvas');
-  const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
-  renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.setSize(window.innerWidth, window.innerHeight);
-
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
-  camera.position.set(0,0,6);
-
-  // central pulsating sphere
-  const sphereGeom = new THREE.SphereGeometry(1.2, 64, 64);
-  const sphereMat = new THREE.MeshStandardMaterial({
-    color: PALETTE.gold,
-    metalness:0.8,
-    roughness:0.2,
-    emissive: new THREE.Color(0x2b1f00),
-    emissiveIntensity:0.4,
-    transparent:true,
-    opacity:0.95
+// ======= Mapa de Ressonâncias =======
+function loadResonances(){
+  db.ref('resonancias').on('value', snapshot=>{
+    const data = snapshot.val() || {};
+    const tbody = document.getElementById('resonanceTable');
+    tbody.innerHTML='';
+    Object.keys(data).forEach(k=>{
+      const r = data[k];
+      const tr = document.createElement('tr');
+      tr.innerHTML=`<td class='px-2 py-1 border-b border-gray-700'>${r.portador||''}</td>
+                     <td class='px-2 py-1 border-b border-gray-700'>${r.mensagem||''}</td>
+                     <td class='px-2 py-1 border-b border-gray-700'>${r.timestamp||''}</td>
+                     <td class='px-2 py-1 border-b border-gray-700'>${r.energia||''}</td>`;
+      tbody.appendChild(tr);
+    });
   });
-  const sphere = new THREE.Mesh(sphereGeom, sphereMat);
-  scene.add(sphere);
+}
 
-  // subtle shell
-  const ringGeom = new THREE.TorusGeometry(1.6, 0.02, 16, 120);
-  const ringMat = new THREE.MeshBasicMaterial({color:PALETTE.purple, opacity:0.06, transparent:true});
-  const ring = new THREE.Mesh(ringGeom, ringMat);
-  ring.rotation.x = Math.PI/2;
-  scene.add(ring);
-
-  // particles
-  const particlesCount = 150;
-  const positions = new Float32Array(particlesCount*3);
-  for(let i=0;i<particlesCount;i++){
-    positions[i*3+0] = (Math.random()-0.5)*8;
-    positions[i*3+1] = (Math.random()-0.5)*6;
-    positions[i*3+2] = (Math.random()-0.5)*6;
-  }
-  const pGeom = new THREE.BufferGeometry();
-  pGeom.setAttribute('position', new THREE.BufferAttribute(positions,3));
-  const pMat = new THREE.PointsMaterial({size:0.03, color:PALETTE.gold, transparent:true, opacity:0.85});
-  const points = new THREE.Points(pGeom,pMat);
-  scene.add(points);
-
-  // lights
-  const amb = new THREE.AmbientLight(0x443322,0.8);
-  scene.add(amb);
-  const rim = new THREE.PointLight(0xC5A65B, 1.2, 20);
-  rim.position.set(5,3,5);
-  scene.add(rim);
-
-  // resize
-  window.addEventListener('resize', ()=>{
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    camera.aspect = window.innerWidth/window.innerHeight;
-    camera.updateProjectionMatrix();
+// ======= Exportar JSON =======
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  db.ref('resonancias').once('value').then(snapshot=>{
+    const data = snapshot.val() || {};
+    const blob = new Blob([JSON.stringify(data, null,2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download='resonancias.json'; a.click();
+    URL.revokeObjectURL(url);
   });
-
-  // mouse / touch interaction
-  let mouse = {x:0,y:0};
-  window.addEventListener('mousemove', (e)=>{
-    mouse.x = (e.clientX/window.innerWidth)-0.5;
-    mouse.y = (e.clientY/window.innerHeight)-0.5;
-  });
-
-  // animation loop
-  let t=0;
-  function animate(){
-    t += 0.01;
-    sphere.scale.set(1 + Math.sin(t*2)*0.03, 1 + Math.sin(t*2)*0.03, 1 + Math.sin(t*2)*0.03);
-    sphere.rotation.y += 0.002 + mouse.x*0.01;
-    ring.rotation.z += 0.0008;
-    points.rotation.y += 0.0005;
-    renderer.render(scene, camera);
-    requestAnimationFrame(animate);
-  }
-  animate();
-
-  // --- Manifesto overlay setup ---
-  const linesContainer = document.getElementById('lines');
-  manifestoPhrases.forEach((text,i)=>{
-    const el = document.createElement('div');
-    el.className = 'manifesto-line absolute text-sm text-gray-200 glow';
-    el.style.transform = `rotate(${(i*(360/manifestoPhrases.length))}deg) translateY(-140px) rotate(${-(i*(360/manifestoPhrases.length))}deg)`;
-    el.style.opacity = 0.9 - (i*0.07);
-    el.innerText = text;
-    linesContainer.appendChild(el);
-  });
-
-  // rotate the manifesto slowly
-  let manifestoAngle = 0;
-  function rotateManifesto(){
-    manifestoAngle += 0.08;
-    document.getElementById('manifesto').style.transform = `translate(-50%,-50%) rotate(${manifestoAngle}deg)`;
-    requestAnimationFrame(rotateManifesto);
-  }
-  rotateManifesto();
-
-  // --- Tone.js sound + interaction registration ---
-  const synth = new Tone.Oscillator(432, 'sine').toDestination();
-  synth.volume.value = -12;
-  let playing = false;
-
-  const enterBtn = document.getElementById('enterBtn');
-  const entrance = document.getElementById('entrance');
-  const countEl = document.getElementById('count');
-  let counter = Number(localStorage.getItem('nx_count') || 0);
-  countEl.innerText = counter;
-
-  function recordResonance(){
-    counter += 1;
-    localStorage.setItem('nx_count', counter);
-    countEl.innerText = counter;
-    // add a particle burst near sphere (visual cue)
-    const burst = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({size:0.06,color:PALETTE.gold}));
-    // quick ephemeral object (skip complex geometry for brevity)
-    setTimeout(()=>{scene.add(burst); setTimeout(()=>scene.remove(burst),900);},0);
-  }
-
-  enterBtn.addEventListener('click', async ()=>{
-    // ensure audio context started
-    await Tone.start();
-    if(!playing){
-      synth.start();
-      entrance.style.display = 'none';
-      playing = true;
-      recordResonance();
-    }
-  });
-
-  // allow clicking canvas to generate new ressonances
-  canvas.addEventListener('pointerdown', ()=>{
-    if(playing){
-      // brief frequency modulation for interaction
-      const now = Tone.now();
-      synth.frequency.rampTo(440, 0.08);
-      synth.frequency.rampTo(432, 0.3);
-      recordResonance();
-    }
-  });
-
-  // keyboard shortcut (space) to toggle
-  window.addEventListener('keydown', (e)=>{
-    if(e.code === 'Space'){
-      e.preventDefault();
-      if(!playing){
-        Tone.start().then(()=>{synth.start(); entrance.style.display='none'; playing=true; recordResonance();});
-      } else {
-        synth.stop(); playing=false; entrance.style.display='flex';
-      }
-    }
-  });
-
-  // small accessibility: if user leaves page stop audio
-  window.addEventListener('visibilitychange', ()=>{
-    if(document.hidden && playing){synth.stop(); playing=false; entrance.style.display='flex';}
-  });
-
-  // initial camera subtle animation to make scene alive
-  let camT = 0;
-  function camLoop(){ camT += 0.002; camera.position.x = Math.sin(camT)*0.6; camera.position.y = Math.sin(camT*0.7)*0.2; camera.lookAt(0,0,0); requestAnimationFrame(camLoop);} camLoop();
-
-  </script></body>
+});
+</script></body>
 </html>
+    
